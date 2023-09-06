@@ -1,0 +1,16 @@
+{% load i18n %}
+
+  <h3>
+    {% blocktranslate with filter_title=title %} By {{ filter_title }} {% endblocktranslate %}
+  </h3>
+  <ul>
+    <li>
+        <select id="model_list_filter" class="form-control" style="width: 100%;margin-left: 0%;" 
+          onchange="window.location.href=this.options[this.selectedIndex].value">
+            {% for choice in choices %}
+                <option{% if choice.selected %} selected="selected"{% endif %} 
+                  value="{{ choice.query_string|iriencode }}">{{ choice.display }}</option>
+            {% endfor %}
+        </select>
+    </li>
+  </ul>

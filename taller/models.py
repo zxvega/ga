@@ -91,6 +91,7 @@ class Vehicle(models.Model):
     state = models.ForeignKey(State, related_name='vehicles',blank=True, null=True, on_delete=models.PROTECT,verbose_name='Estado')
     customer = models.ForeignKey(Customer, related_name='vehicles',blank=True, null=True ,on_delete=models.PROTECT,verbose_name='Propietario')
     available = models.BooleanField(default=True,verbose_name='Disponible')
+    reserved = models.BooleanField(default=False,verbose_name='Reservado')
 
     def __str__(self):
         return self.title
@@ -160,6 +161,30 @@ class MoveDetail(models.Model):
         verbose_name = 'Detalle'
         verbose_name_plural = 'Detalles'
 
+CURRENCY_CHOICES =(
+    ("$Bs", "Bolivianos"),
+    ("$Usd", "Dolares"),
+)
+
+class Reserve(models.Model):
+    id = models.AutoField(primary_key=True)
+    created = models.DateTimeField(auto_now_add=True, verbose_name='Creado')
+    updated = models.DateTimeField(auto_now=True, verbose_name='Modificado')
+    date = models.DateField(verbose_name='Fecha')
+    amount = models.DecimalField(max_digits=12, decimal_places=2, verbose_name= "Importe")
+    currency = models.CharField(choices = CURRENCY_CHOICES, default='$Usd', max_length=5)
+    vehicle = models.ForeignKey(Vehicle, related_name='reserves',blank=True, null=True ,on_delete=models.PROTECT,verbose_name='Vehiculo')
+    customer = models.ForeignKey(Customer, related_name='reserves',blank=True, null=True, on_delete=models.PROTECT,verbose_name='Cliente')
+    seller = models.ForeignKey(Employee, related_name='reserves',blank=True, null=True, on_delete=models.PROTECT,verbose_name='Vendedor')
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return 'Reserva: ' + str(self.id)
+
+    class Meta:
+        verbose_name = 'Reserva'
+        verbose_name_plural = 'Reservas'
+
 # Señales Sale 
 
 @receiver(post_save, sender=Sale)
@@ -196,3 +221,12 @@ def update_vehicle_move_reverse(sender, instance, **kwargs):
     vehicle = Vehicle.objects.get(id=instance.vehicle.id)
     vehicle.location = instance.source_location
     vehicle.save()
+
+# Señales Sale 
+
+@receiver(post_save, sender=Reserve)
+def set_vehicle_sold(sender, created, instance, **kwargs):
+    if created:
+        vehicle = Vehicle.objects.get(id=instance.vehicle.id)
+        vehicle.reserved = True
+        vehicle.save()

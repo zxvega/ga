@@ -4,7 +4,7 @@ from django.contrib.admin.models import LogEntry
 from import_export.admin import ExportActionMixin
 from admin_auto_filters.filters import AutocompleteFilter
 from rangefilter.filters import DateRangeFilterBuilder
-from .models import Location, Customer, Vehicle, Brand, State, Sale, Employee, Type, Move, MoveDetail
+from .models import Location, Customer, Vehicle, Brand, State, Sale, Employee, Type, Move, MoveDetail, Reserve
 
 admin.site.site_header = "Importadora Ejemplo"
 admin.site.site_title  = "Importadora Ejemplo"
@@ -138,20 +138,20 @@ class VehicleAdmin(ExportActionMixin,admin.ModelAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        #new_queryset = queryset.filter(available=True)
-        #return new_queryset"""
-        return queryset
+        new_queryset = queryset.filter(available=True, reserved=False)
+        return new_queryset
+        #return queryset
 
     def get_readonly_fields(self, request, obj=None):
         if obj:
-            return ('location','available','customer','created','updated',)
+            return ('reserved','location','available','customer','created','updated',)
         else: 
-            return ('available','customer','created','updated',)
+            return ('reserved','available','customer','created','updated',)
 
     def get_search_results(self, request, queryset, search_term):
         queryset, use_distinct = super().get_search_results(request, queryset, search_term)
         if request.META.get('HTTP_X_REQUESTED_WITH') == 'XMLHttpRequest':
-            queryset = queryset.filter(available=True)
+            queryset = queryset.filter(available=True,reserved = False)
         return queryset, use_distinct
     
     def get_actions(self, request):
@@ -224,14 +224,6 @@ class SaleAdmin(ExportActionMixin,admin.ModelAdmin):
     list_per_page = 10
     model = Sale
 
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if request.resolver_match.func.__name__ == 'add_view':  
-            if db_field.name == 'vehicle':
-                kwargs["queryset"] = Vehicle.objects.filter(available = True)
-            if db_field.name == 'customer':
-                kwargs["queryset"] = Customer.objects.all()
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
-
     def get_actions(self, request):
         actions = super().get_actions(request)
         if 'delete_selected' in actions:
@@ -247,6 +239,63 @@ class SaleAdmin(ExportActionMixin,admin.ModelAdmin):
 
 admin.site.register(Sale, SaleAdmin)
 
+# Reserva
+
+class ReserveAdmin(ExportActionMixin,admin.ModelAdmin):
+    search_fields = ['customer__name','customer__last_name','vehicle__serie']
+    autocomplete_fields = ('vehicle',)
+    list_filter = (('date',DateRangeFilterBuilder()),)
+    list_display = ('id', 'date', 'customer', 'vehicle', 'seller','active')
+    list_per_page = 10
+    model = Reserve
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        new_queryset = queryset.filter(active=True)
+        return new_queryset
+
+    @admin.action
+    def reverse(self, request, queryset):
+        for obj in queryset:
+            if(obj.active==True):
+                vehicle = Vehicle.objects.get(id=obj.vehicle.id)
+                vehicle.reserved = False
+                vehicle.save()
+                obj.active = False
+                obj.save()
+
+    reverse.short_description = "Revertir Reserva(s)"
+
+    @admin.action
+    def sell(self, request, queryset):
+        for obj in queryset:
+            if(obj.active==True):
+                sale = Sale()
+                sale.date = obj.date
+                sale.vehicle = obj.vehicle
+                sale.customer = obj.customer
+                sale.seller = obj.seller
+                sale.save()
+                obj.active =  False
+                obj.save()
+
+    sell.short_description = "Convertir en Venta(s)"
+    actions = ['reverse','sell']
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if 'delete_selected' in actions:
+            del actions['delete_selected']
+        return actions
+
+    def get_readonly_fields(self, request, obj=None):
+        readonly_fields = super().get_readonly_fields(request, obj)
+        if obj:  
+            return ('customer','vehicle','created','updated',)
+        else:  
+            return readonly_fields
+
+admin.site.register(Reserve, ReserveAdmin)
 
 
 

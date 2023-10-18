@@ -245,7 +245,7 @@ class ReserveAdmin(ExportActionMixin,admin.ModelAdmin):
     search_fields = ['customer__name','customer__last_name','vehicle__serie']
     autocomplete_fields = ('vehicle',)
     list_filter = (('date',DateRangeFilterBuilder()),)
-    list_display = ('id', 'date', 'customer', 'vehicle', 'seller','active')
+    list_display = ('id', 'date', 'customer', 'vehicle', 'get_location' ,'get_brand' ,'get_model' ,'seller','active')
     list_per_page = 10
     model = Reserve
 
@@ -294,6 +294,21 @@ class ReserveAdmin(ExportActionMixin,admin.ModelAdmin):
             return ('customer','vehicle','created','updated',)
         else:  
             return readonly_fields
+        
+    def get_location(self, obj):
+        return obj.vehicle.location
+
+    get_location.short_description = 'Sucursal'   
+
+    def get_brand(self, obj):
+        return obj.vehicle.brand.title
+
+    get_brand.short_description = 'Marca'   
+
+    def get_model(self, obj):
+        return obj.vehicle.model
+
+    get_model.short_description = 'Modelo'   
 
 admin.site.register(Reserve, ReserveAdmin)
 
